@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:camel="http://camel.apache.org/schema/spring"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans   http://www.springframework.org/schema/beans/spring-beans-3.0.xsd  
+	http://camel.apache.org/schema/spring   http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+	<camelContext
+		xmlns="http://camel.apache.org/schema/spring">
+
+		<propertyPlaceholder id="placeholder"
+			location="file:${env:APP_ENV}" />
+
+		<onException>
+			<exception>com.jayway.jsonpath.PathNotFoundException</exception>
+			<handled>
+				<constant>true</constant>
+			</handled>
+			<setProperty propertyName="responseDetail">
+				<simple>Missing parameter in request: ${exception.message.split('\$')[1]}</simple>
+			</setProperty>
+			<to uri="direct:error" />
+		</onException>
+
+		<onException>
+			<exception>com.jayway.jsonpath.InvalidJsonException</exception>
+			<handled>
+				<constant>true</constant>
+			</handled>
+			<setProperty propertyName="responseDetail">
+				<simple>Malformed body as supported JSon value</simple>
+			</setProperty>
+			<to uri="direct:error" />
+		</onException>
+
+		<onException>
+			<exception>org.apache.camel.ExpressionEvaluationException</exception>
+			<handled>
+				<constant>true</constant>
+			</handled>
+			<setProperty propertyName="responseDetail">
+				<simple>Cannot read message body as supported JSon value</simple>
+			</setProperty>
+			<to uri="direct:error" />
+		</onException>
+
+		<onException>
+			<exception>java.lang.Exception</exception>
+			<handled>
+				<constant>true</constant>
+			</handled>
+			<setHeader headerName="CamelHttpResponseCode">
+				<constant>500</constant>
+			</setHeader>
+			<setProperty propertyName="responseCode">
+				<constant>500</constant>
+			</setProperty>
+			<setProperty propertyName="responseMessage">
+				<constant>Internal Error</constant>
+			</setProperty>
+			<log message="\n${exception.stacktrace}" />
+			<to uri="direct:error" />
+		</onException>
+
+		<route>
+			<from uri="direct:error" />
+			<removeHeaders pattern="*"
+				excludePattern="CamelHttpResponseCode" />
+			<setHeader headerName="Content-Type">
+				<constant>application/json; charset=utf-8</constant>
+			</setHeader>
+			<when>
+				<simple>${headers.CamelHttpResponseCode} == null</simple>
+				<setHeader headerName="CamelHttpResponseCode">
+					<constant>400</constant>
+				</setHeader>
+				<setProperty propertyName="responseCode">
+					<simple>400</simple>
+				</setProperty>
+				<setProperty propertyName="responseMessage">
+					<simple>bad request</simple>
+				</setProperty>
+			</when>
+			<to uri="velocity:velocity/Error.vm" />
+			<stop />
+		</route>
+
+		<route streamCache="true">
+			<from
+				uri="restlet:http://{{service.rest.host}}:{{service.rest.port}}{{service.rest.resource}}?restletMethod={{service.rest.method}}" />
+
+			<log message="Body : \n${body}" />
+
+			<setProperty propertyName="senderParameter">
+				<jsonpath resultType="Long">$.sender</jsonpath>
+			</setProperty>
+			<setProperty propertyName="shortcodeParameter">
+				<jsonpath resultType="Integer">$.shortcode</jsonpath>
+			</setProperty>
+			<setProperty propertyName="timestampParameter">
+				<jsonpath resultType="Long">$.timestamp</jsonpath>
+			</setProperty>
+			<setProperty propertyName="operatorParameter">
+				<jsonpath resultType="String">$.operator</jsonpath>
+			</setProperty>
+			<setProperty propertyName="referenceIdParameter">
+				<jsonpath resultType="String">$.referenceId</jsonpath>
+			</setProperty>
+
+			<!-- Validation Empty -->
+			<when>
+				<simple>${property.operatorParameter} == null || ${property.operatorParameter} == ''</simple>
+				<setProperty propertyName="responseDetail">
+					<simple>Empty parameter in request: operator</simple>
+				</setProperty>
+				<to uri="direct:error" />
+			</when>
+			<when>
+				<simple>${property.referenceIdParameter} == null || ${property.referenceIdParameter} == ''</simple>
+				<setProperty propertyName="responseDetail">
+					<simple>Empty parameter in request: referenceId</simple>
+				</setProperty>
+				<to uri="direct:error" />
+			</when>
+
+			<!-- Validation Length -->
+			<when>
+				<simple>${property.operatorParameter.length} == 0 || ${property.operatorParameter.length} > 50</simple>
+				<setProperty propertyName="responseDetail">
+					<simple>Invalid parameter length in request: operator</simple>
+				</setProperty>
+				<to uri="direct:error" />
+			</when>
+			<when>
+				<simple>${property.referenceIdParameter.length} == 0 || ${property.referenceIdParameter.length} > 50</simple>
+				<setProperty propertyName="responseDetail">
+					<simple>Invalid parameter length in request: referenceId</simple>
+				</setProperty>
+				<to uri="direct:error" />
+			</when>
+
+			<!-- Success -->
+			<removeHeaders pattern="*" />
+			<setHeader headerName="Content-Type">
+				<constant>application/json; charset=utf-8</constant>
+			</setHeader>
+			<setProperty propertyName="responseCode">
+				<simple>OK</simple>
+			</setProperty>
+			<setProperty propertyName="responseMessage">
+				<simple>Success</simple>
+			</setProperty>
+			<to uri="velocity:velocity/Success.vm" />
+		</route>
+	</camelContext>
+</beans>

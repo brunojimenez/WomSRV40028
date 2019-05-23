@@ -1,0 +1,21 @@
+{
+	#if ($exchange.properties.responseCode)
+    	"responseCode": "${exchange.properties.responseCode}"
+	#else
+		"responseCode": "NOK"
+	#end
+    
+    #if ($exchange.properties.responseMessage)
+    	, "responseMessage": "${exchange.properties.responseMessage}"
+    #else
+    	, "responseMessage": ""
+    #end
+    
+    #if($exchange.properties.responseDetail)
+    , "responseDetail": "${exchange.properties.responseDetail}"
+    #end
+    
+    #if($exchange.properties.parameterEmpty)
+    , "responseDetail": "Parameter is empty in request: ${exchange.properties.parameterEmpty}"
+    #end
+}

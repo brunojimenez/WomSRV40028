@@ -1,0 +1,13 @@
+{
+	#if ($exchange.properties.responseCode)
+    	"responseCode": "${exchange.properties.responseCode}"
+	#else
+		"responseCode": "OK"
+	#end
+    
+    #if ($exchange.properties.responseMessage)
+    	, "responseMessage": "${exchange.properties.responseMessage}"
+    #else
+    	, "responseMessage": "Success"
+    #end
+}
